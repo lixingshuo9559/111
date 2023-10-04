@@ -1,0 +1,59 @@
+#%%
+import geopandas
+import requests
+import json
+import os
+
+district_url = 'https://restapi.amap.com/v3/config/district?keywords={city}&key={api_key}'
+geo_json_url = 'https://geo.datav.aliyun.com/areas/bound/{city_code}_full.json'
+api_key = None  # 配置高德地图API KEY
+path = None
+
+#%%
+def get_district_code(city, api_key):
+    url = district_url.format(city=city, api_key=api_key)
+    payload = {}
+    headers = {}
+    response = requests.request("GET", url, headers=headers, data=payload)
+    result = json.loads(response.text)
+    return result["districts"][0]["adcode"]
+
+#%%
+def download_geojson(city, city_code):
+    file_path = os.path.join(path, city + '.json')
+    if os.path.exists(file_path):
+        print('Reading from local files...')
+        with open(file_path, 'r') as f:
+            result = json.load(f)
+    else:
+        print('Downloading from website...')
+        url = geo_json_url.format(city_code=city_code)
+        response = requests.get(url)
+        result = json.loads(response.text)
+        with open(file_path, 'w') as f:
+            json.dump(result, f, indent=4)
+    return result
+
+#%%
+def generate_shape(city):
+    file_name = os.path.join(path, city + '.json')
+    shp_file_path = os.path.join(path, city + '.shp')
+    try:
+        data = geopandas.read_file(file_name)
+        localPath = str(shp_file_path)
+        data.to_file(localPath, driver='ESRI Shapefile', encoding='gbk')
+        print(f"{city}shp文件生成成功")
+        print(f"文件存储在：{os.path.join(path,city+'.shp')}")
+    except Exception as e:
+        print(e)
+#%%
+if __name__ == '__main__':
+    city = input('输入城市名称：大理市')
+    if api_key is None:
+        city_code = input('输入城市编码：671000')
+    else:
+        city_code = get_district_code(city, api_key)
+    path = input('输入存储路径：D:\桌面 ')
+    download_geojson(city, city_code)
+    generate_shape(city)
+# %%
